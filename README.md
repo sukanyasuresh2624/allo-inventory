@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Allo Inventory Reservation System
 
-## Getting Started
+A Next.js application that solves the race condition problem in e-commerce checkout — reserving inventory temporarily while payment is processed.
 
-First, run the development server:
+## Live Demo
+
+> URL added after Vercel deployment
+
+## How to Run Locally
+
+### Prerequisites
+- Node.js 18+
+- A Supabase or Neon PostgreSQL database
+
+### Setup
+
+```bash
+git clone https://github.com/sukanyasuresh2624/allo-inventory.git
+cd allo-inventory
+npm install
+cp .env.example .env
+# Fill in your DATABASE_URL and CRON_SECRET
+```
+
+### Database
+
+```bash
+npx prisma db push
+npx prisma db seed
+```
+
+### Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How the Expiry Mechanism Works
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Two-layer approach:
 
-## Learn More
+**Layer 1 — Lazy cleanup on read:**
+Every `confirm` call checks `expiresAt < now()` inside the transaction. If expired, returns 410 and stock is released immediately at the point of action.
 
-To learn more about Next.js, take a look at the following resources:
+**Layer 2 — Vercel Cron (every 5 minutes):**
+`vercel.json` schedules `GET /api/cron/cleanup` every 5 minutes. It finds all `PENDING` reservations where `expiresAt < now()`, decrements `reservedStock`, and marks them `RELEASED`. Keeps the database clean even with no user activity.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## How Concurrency is Handled
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+When two requests arrive simultaneously for the last unit:
 
-## Deploy on Vercel
+1. Both enter `prisma.$transaction()`
+2. Both run `SELECT ... FOR UPDATE` on the Inventory row
+3. PostgreSQL row-level lock makes the second request **wait**
+4. First commits → second re-reads → finds `availableStock = 0`
+5. Second throws `INSUFFICIENT_STOCK` → returns **409**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+No Redis needed for core logic. Pure PostgreSQL `FOR UPDATE`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## API Reference
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/products` | List products with available stock |
+| GET | `/api/warehouses` | List warehouses |
+| POST | `/api/reservations` | Reserve units (409 if no stock) |
+| POST | `/api/reservations/:id/confirm` | Confirm reservation (410 if expired) |
+| POST | `/api/reservations/:id/release` | Release reservation early |
+| GET | `/api/cron/cleanup` | Release all expired reservations |
+
+## Trade-offs & What I'd Do Differently
+
+- **Connection pooling:** Using Supabase pooler URL in production to avoid hitting connection limits on the free tier.
+- **Cron granularity:** 5-minute cleanup means stock could appear reserved up to 5 minutes after expiry. A dedicated worker (BullMQ) would give sub-minute cleanup.
+- **Idempotency:** Implemented via `Idempotency-Key` header stored on the Reservation row with a unique constraint.
+- **Frontend refresh:** UI updates in-place after confirm/cancel using React state — no page reload needed.
+
+## Tech Stack
+
+Next.js 16 · TypeScript · PostgreSQL (Supabase) · Prisma 6 · Zod · Tailwind CSS · shadcn/ui · Vercel
