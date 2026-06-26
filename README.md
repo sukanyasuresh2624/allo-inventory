@@ -4,7 +4,7 @@ A Next.js application that solves the race condition problem in e-commerce check
 
 ## Live Demo
 
-> URL added after Vercel deployment
+> URL will be added after Vercel deployment
 
 ## How to Run Locally
 
@@ -42,10 +42,10 @@ Open [http://localhost:3000](http://localhost:3000)
 Two-layer approach:
 
 **Layer 1 — Lazy cleanup on read:**
-Every `confirm` call checks `expiresAt < now()` inside the transaction. If expired, returns 410 and stock is released immediately at the point of action.
+Every `confirm` call checks `expiresAt < now()` inside the transaction. If expired, returns 410 and stock is released immediately.
 
 **Layer 2 — Vercel Cron (every 5 minutes):**
-`vercel.json` schedules `GET /api/cron/cleanup` every 5 minutes. It finds all `PENDING` reservations where `expiresAt < now()`, decrements `reservedStock`, and marks them `RELEASED`. Keeps the database clean even with no user activity.
+`vercel.json` schedules `GET /api/cron/cleanup` every 5 minutes. It finds all `PENDING` reservations where `expiresAt < now()`, decrements `reservedStock`, and marks them `RELEASED`.
 
 ## How Concurrency is Handled
 
