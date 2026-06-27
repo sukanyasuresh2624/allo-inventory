@@ -33,6 +33,7 @@ export default async function ReservationPage({
         quantity: reservation.quantity,
         expiresAt: reservation.expiresAt.toISOString(),
         productName: reservation.inventory.product.name,
+        productImage: reservation.inventory.product.imageUrl ?? null,
         warehouseName: reservation.inventory.warehouse.name,
         warehouseLocation: reservation.inventory.warehouse.location,
       }}

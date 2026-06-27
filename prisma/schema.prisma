@@ -11,6 +11,7 @@ model Product {
   id          String      @id @default(cuid())
   name        String
   description String?
+  imageUrl    String?
   createdAt   DateTime    @default(now())
   inventory   Inventory[]
 }
