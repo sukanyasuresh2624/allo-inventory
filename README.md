@@ -4,7 +4,8 @@ A Next.js application that solves the race condition problem in e-commerce check
 
 ## Live Demo
 
-> URL will be added after Vercel deployment
+
+[https://allo-inventory-navy.vercel.app](https://allo-inventory-navy.vercel.app)
 
 ## How to Run Locally
 
